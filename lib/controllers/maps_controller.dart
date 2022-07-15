@@ -15,9 +15,11 @@ class MapsController extends ChangeNotifier {
   late CameraPosition initialCameraPosition;
   Position? lastPosition;
   Set<Marker> markers = <Marker>{};
+
   Set<Polyline> polylines = <Polyline>{};
   bool isLoadingInit = false;
   late bool locationIsEnable;
+  String? currentAddress;
   MapsController() {
     _initController();
   }
@@ -113,6 +115,28 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void zoomIn() {
+    mapController!.animateCamera(CameraUpdate.zoomIn());
+    notifyListeners();
+  }
+
+  void zommOut() {
+    mapController!.animateCamera(CameraUpdate.zoomOut());
+    notifyListeners();
+  }
+
+  Future<void> newCameraPosition(LatLng latLng) async {
+    mapController!.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: latLng,
+          zoom: await mapController!.getZoomLevel(),
+        ),
+      ),
+    );
+    notifyListeners();
+  }
+
   _changeMyMarkerPosition(LatLng latLng) async {
     double rotation = 0;
     if (lastPosition != null) {
@@ -180,6 +204,39 @@ class MapsController extends ChangeNotifier {
     polylines.add(polyline);
   }
 
+  changeOrigimAddressMarker(LatLng latLng, {String? address}) {
+    markers.add(
+      Marker(
+        markerId: MarkerId('origin-address-marker'),
+        position: LatLng(0, 0),
+        infoWindow: InfoWindow(
+          title: 'Origem',
+          snippet: address,
+        ),
+      ),
+    );
+  }
+
+  changeDestinationAddressMarker(LatLng latLng, {String? address}) {
+    markers.add(
+      Marker(
+        markerId: MarkerId('destination-address-marker'),
+        position: LatLng(-19.8532936, -43.924114116),
+        infoWindow: InfoWindow(
+          title: 'Destino',
+          snippet: address,
+        ),
+        icon: BitmapDescriptor.defaultMarker,
+      ),
+    );
+  }
+
+  void getCurrentLocation() async {
+    final position = await Geolocator.getCurrentPosition();
+    await changeCameraAndMyMarkerPosition(
+        LatLng(position.latitude, position.longitude));
+  }
+
   onRequestPermission() async {
     try {
       final permission = await Geolocator.requestPermission();
@@ -198,6 +255,7 @@ class MapsController extends ChangeNotifier {
 
   void onTap(LatLng latLng) async {
     setMarkerPosition(latLng);
+    await newCameraPosition(latLng);
     notifyListeners();
   }
 
