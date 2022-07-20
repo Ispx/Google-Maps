@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_routes/utils/routers.dart';
 import 'package:google_maps_routes/views/home_page.dart';
 import 'package:google_maps_routes/views/permission_location_page.dart';
+import 'package:google_maps_routes/views/search_address_page.dart';
 import 'package:google_maps_routes/views/spash_page.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
@@ -28,6 +29,13 @@ class MyApp extends StatelessWidget {
         if (routerName == '${Routes.PERMISSION}/location') {
           return MaterialPageRoute(
             builder: (context) => PermissionLocationPage(),
+          );
+        }
+        if (routerName == '/search-address/') {
+          return MaterialPageRoute(
+            builder: (context) => SearchAddressPage(
+              hint: onRouter.arguments.toString(),
+            ),
           );
         }
         return null;
