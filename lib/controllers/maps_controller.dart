@@ -5,24 +5,43 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_routes/helpers/image_to_bytes.dart';
+import 'package:geocoding/geocoding.dart';
 
 import '../utils/map_style_util.dart';
 
 class MapsController extends ChangeNotifier {
+  factory MapsController() => _instance;
+  static final MapsController _instance = MapsController._();
+  MapsController._() {
+    _initController();
+  }
   Completer<BitmapDescriptor> iconBitMap = Completer<BitmapDescriptor>();
   GoogleMapController? mapController;
   late LocationSettings locationSettings;
   late CameraPosition initialCameraPosition;
   Position? lastPosition;
   Set<Marker> markers = <Marker>{};
-
   Set<Polyline> polylines = <Polyline>{};
   bool isLoadingInit = false;
   late bool locationIsEnable;
-  String? currentAddress;
-  MapsController() {
-    _initController();
-  }
+  bool searchingAddress = false;
+  Map<Location, List<Placemark>> mapLocationPlaceMark = {};
+  Set<Placemark> addressesPlaceMarks = {};
+  Map<Location?, Placemark?>? _placeAddressOrigin = {};
+  Map<Location?, Placemark?>? _placeAddressDestination = {};
+
+  Location? get locationOrigin => _placeAddressOrigin?.keys.first;
+  Placemark? get placeMarkOrigin => _placeAddressOrigin?.values.first;
+  Location? get locationDestination => _placeAddressDestination?.keys.first;
+  Placemark? get placeMarkDestination => _placeAddressDestination?.values.first;
+
+  String get addressOrigin => _placeAddressOrigin != null
+      ? "${_placeAddressOrigin?.values.first?.street},CEP: ${_placeAddressOrigin?.values.first?.postalCode}"
+      : '';
+  String get addressDestination => _placeAddressDestination != null
+      ? "${_placeAddressDestination?.values.first?.street},CEP: ${_placeAddressDestination?.values.first?.postalCode}"
+      : '';
+
   listenPosition() {
     Geolocator.getPositionStream(
       locationSettings: LocationSettings(
@@ -33,7 +52,7 @@ class MapsController extends ChangeNotifier {
       (Position? position) {
         lastPosition = position;
         if (position != null) {
-          changeCameraAndMyMarkerPosition(
+          animatedCameraAndMyMarkerPosition(
             LatLng(position.latitude, position.longitude),
           );
         }
@@ -51,6 +70,42 @@ class MapsController extends ChangeNotifier {
 
   changeLocationServiceIsEnable(bool isTrue) {
     locationIsEnable = isTrue;
+    notifyListeners();
+  }
+
+  setPlaceAddressDestination(Placemark address, Location location) {
+    _placeAddressDestination = {};
+    _placeAddressDestination?.addAll({location: address});
+    notifyListeners();
+  }
+
+  setPlaceAddressOrigin(Placemark address, Location location) {
+    _placeAddressOrigin = {};
+    _placeAddressOrigin?.addAll({location: address});
+    notifyListeners();
+  }
+
+  setPlaceAddressOriginFromSearch(Placemark address) {
+    _placeAddressOrigin = {};
+    var location = mapLocationPlaceMark.entries
+        .where((element) =>
+            element.value.map((e) => e.postalCode).contains(address.postalCode))
+        .first
+        .key;
+    _placeAddressOrigin?.addAll({location: address});
+    _clearStorageAddressSearched();
+    notifyListeners();
+  }
+
+  setPlaceAddressDestinationFromSearch(Placemark address) {
+    _placeAddressDestination = {};
+    var location = mapLocationPlaceMark.entries
+        .where((element) =>
+            element.value.map((e) => e.postalCode).contains(address.postalCode))
+        .first
+        .key;
+    _placeAddressDestination?.addAll({location: address});
+    _clearStorageAddressSearched();
     notifyListeners();
   }
 
@@ -137,6 +192,44 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  changeSearchingAddress(bool isTrue) {
+    searchingAddress = isTrue;
+    notifyListeners();
+  }
+
+  _clearStorageAddressSearched() {
+    mapLocationPlaceMark = {};
+    addressesPlaceMarks.clear();
+  }
+
+  Future<Position> currentPosition() async {
+    return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+  }
+
+  Future<void> searchAddress(String address) async {
+    mapLocationPlaceMark = {};
+    try {
+      changeSearchingAddress(true);
+      final locations =
+          await locationFromAddress(address, localeIdentifier: 'pt_BR');
+      for (var location in locations) {
+        var places = (await placemarkFromCoordinates(
+                location.latitude, location.longitude,
+                localeIdentifier: 'pt_BR'))
+            .toSet();
+        var values = places.map((e) => MapEntry(location, [...places]));
+        mapLocationPlaceMark.addEntries(values);
+        addressesPlaceMarks.addAll(places);
+      }
+    } catch (e) {
+      print(e.toString());
+    } finally {
+      changeSearchingAddress(false);
+      notifyListeners();
+    }
+  }
+
   _changeMyMarkerPosition(LatLng latLng) async {
     double rotation = 0;
     if (lastPosition != null) {
@@ -170,7 +263,34 @@ class MapsController extends ChangeNotifier {
     markers.add(marker);
   }
 
-  changeCameraAndMyMarkerPosition(LatLng latLng) {
+  animatedCameraTwoLating(
+      LatLng fromLocationLatLng, LatLng toLocationLatLng, double zoom) {
+    final cameraUpdate = CameraUpdate.newLatLngBounds(
+      LatLngBounds(
+        southwest: LatLng(
+          fromLocationLatLng.latitude <= toLocationLatLng.latitude
+              ? fromLocationLatLng.latitude
+              : toLocationLatLng.latitude,
+          fromLocationLatLng.longitude <= toLocationLatLng.longitude
+              ? fromLocationLatLng.longitude
+              : toLocationLatLng.longitude,
+        ),
+        northeast: LatLng(
+          fromLocationLatLng.latitude <= toLocationLatLng.latitude
+              ? toLocationLatLng.latitude
+              : fromLocationLatLng.latitude,
+          fromLocationLatLng.longitude <= toLocationLatLng.longitude
+              ? toLocationLatLng.longitude
+              : fromLocationLatLng.longitude,
+        ),
+      ),
+      zoom,
+    );
+    mapController!.animateCamera(cameraUpdate);
+    notifyListeners();
+  }
+
+  animatedCameraAndMyMarkerPosition(LatLng latLng) {
     _changeMyMarkerPosition(latLng);
     if (mapController != null) {
       final cameraUpdate = CameraUpdate.newLatLngZoom(
@@ -188,7 +308,7 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  _initPolylines({
+  changePolylines({
     required LatLng latLng1,
     required LatLng latLng2,
   }) {
@@ -202,38 +322,43 @@ class MapsController extends ChangeNotifier {
       ],
     );
     polylines.add(polyline);
+    animatedCameraTwoLating(latLng1, latLng2, 120);
   }
 
-  changeOrigimAddressMarker(LatLng latLng, {String? address}) {
+  changeOriginAddressMarker() {
     markers.add(
       Marker(
         markerId: MarkerId('origin-address-marker'),
-        position: LatLng(0, 0),
+        position: LatLng(_placeAddressOrigin?.keys.first?.latitude ?? 0.0,
+            _placeAddressOrigin?.keys.first?.longitude ?? 0.0),
         infoWindow: InfoWindow(
           title: 'Origem',
-          snippet: address,
+          snippet: addressOrigin,
         ),
       ),
     );
+    notifyListeners();
   }
 
-  changeDestinationAddressMarker(LatLng latLng, {String? address}) {
+  changeDestinationAddressMarker() {
     markers.add(
       Marker(
         markerId: MarkerId('destination-address-marker'),
-        position: LatLng(-19.8532936, -43.924114116),
+        position: LatLng(_placeAddressDestination?.keys.first?.latitude ?? 0.0,
+            _placeAddressDestination?.keys.first?.longitude ?? 0.0),
         infoWindow: InfoWindow(
           title: 'Destino',
-          snippet: address,
+          snippet: addressDestination,
         ),
         icon: BitmapDescriptor.defaultMarker,
       ),
     );
+    notifyListeners();
   }
 
   void getCurrentLocation() async {
     final position = await Geolocator.getCurrentPosition();
-    await changeCameraAndMyMarkerPosition(
+    await animatedCameraAndMyMarkerPosition(
         LatLng(position.latitude, position.longitude));
   }
 
@@ -243,7 +368,7 @@ class MapsController extends ChangeNotifier {
       if (permission == LocationPermission.always ||
           permission == LocationPermission.whileInUse) {
         final position = await Geolocator.getCurrentPosition();
-        changeCameraAndMyMarkerPosition(
+        animatedCameraAndMyMarkerPosition(
             LatLng(position.latitude, position.longitude));
         changeLocationServiceIsEnable(true);
       }
@@ -302,11 +427,8 @@ class MapsController extends ChangeNotifier {
         zoom: 25,
       );
     }
-    _initPolylines(
-      latLng1: LatLng(-19.7999877, -43.9744977),
-      latLng2: LatLng(-19.8532936, -43.9241141),
-    );
-    changeCameraAndMyMarkerPosition(
+
+    animatedCameraAndMyMarkerPosition(
       LatLng(position.latitude, position.longitude),
     );
   }
