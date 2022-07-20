@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_routes/controllers/maps_controller.dart';
+import 'package:google_maps_routes/utils/routers.dart';
 import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
@@ -13,7 +15,12 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   late MapsController controller;
+  TextEditingController addressOriginEditingController =
+      TextEditingController();
+  TextEditingController addressDestinationEditingController =
+      TextEditingController();
 
+  FocusNode focusNode = FocusNode();
   @override
   void initState() {
     super.initState();
@@ -46,13 +53,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         child: ChangeNotifierProvider.value(
           value: controller,
           builder: (context, _) => Consumer<MapsController>(
-            builder: (context, value, child) {
-              if (value.isLoadingInit) {
+            builder: (context, valueController, child) {
+              if (valueController.isLoadingInit) {
                 return Center(
                   child: CircularProgressIndicator(),
                 );
               }
-              if (value.locationIsEnable == false) {
+              if (valueController.locationIsEnable == false) {
                 return Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -62,7 +69,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       textAlign: TextAlign.center,
                     ),
                     TextButton(
-                      onPressed: () async => await value.onRequestPermission(),
+                      onPressed: () async =>
+                          await valueController.onRequestPermission(),
                       child: Text('Ativar'),
                     )
                   ],
@@ -72,15 +80,114 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 alignment: Alignment.topCenter,
                 children: [
                   GoogleMap(
-                    initialCameraPosition: value.initialCameraPosition,
+                    initialCameraPosition:
+                        valueController.initialCameraPosition,
                     onMapCreated: controller.changeMapsController,
-                    markers: Set<Marker>.from(value.markers),
-                    polylines: value.polylines,
-                    onTap: controller.onTap,
+                    markers: Set<Marker>.from(valueController.markers),
+                    polylines: valueController.polylines,
+                    // onTap: controller.onTap,
                     myLocationButtonEnabled: false,
                     zoomControlsEnabled: false,
                   ),
-                  AddressesWidget(),
+                  Container(
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height * .25,
+                    decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.8),
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Text('Pesquisar'),
+                        TextFieldWidget(
+                          controller: addressOriginEditingController,
+                          key: ValueKey('origin'),
+                          labelText: 'Origem',
+                          hintText: 'Pesquisar endereço de início',
+                          suffixIcon: IconButton(
+                            onPressed: () async {
+                              Position myPosition =
+                                  await valueController.currentPosition();
+                              Placemark placemark =
+                                  (await placemarkFromCoordinates(
+                                myPosition.latitude,
+                                myPosition.longitude,
+                                localeIdentifier: 'pt_BR',
+                              ))
+                                      .first;
+                              valueController.setPlaceAddressOrigin(
+                                placemark,
+                                Location(
+                                  latitude: myPosition.latitude,
+                                  longitude: myPosition.longitude,
+                                  timestamp:
+                                      myPosition.timestamp ?? DateTime.now(),
+                                ),
+                              );
+                              addressOriginEditingController.text =
+                                  valueController.addressOrigin;
+                            },
+                            icon: Icon(
+                              Icons.location_searching,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          onTap: () async {
+                            var result = await Navigator.pushNamed(
+                              context,
+                              Routes.SEARCH_ADDRESS,
+                              arguments: 'Pesquisar endereço de início',
+                            );
+                            if (result != null) {
+                              valueController.setPlaceAddressOriginFromSearch(
+                                  result as Placemark);
+                              addressOriginEditingController.text =
+                                  valueController.addressOrigin;
+                            }
+                          },
+                        ),
+                        SizedBox(
+                          height: 8,
+                        ),
+                        TextFieldWidget(
+                          controller: addressDestinationEditingController,
+                          key: ValueKey('destination'),
+                          labelText: 'Destino',
+                          hintText: 'Pesquisar endereço de destino',
+                          onTap: () async {
+                            var result = await Navigator.pushNamed(
+                              context,
+                              Routes.SEARCH_ADDRESS,
+                              arguments: 'Pesquisar endereço de destino',
+                            );
+                            if (result != null) {
+                              valueController
+                                  .setPlaceAddressDestinationFromSearch(
+                                      result as Placemark);
+                              addressDestinationEditingController.text =
+                                  valueController.addressDestination;
+                            }
+                          },
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            valueController.changePolylines(
+                              latLng1: LatLng(
+                                  valueController.locationOrigin!.latitude,
+                                  valueController.locationOrigin!.longitude),
+                              latLng2: LatLng(
+                                valueController.locationDestination!.latitude,
+                                valueController.locationDestination!.longitude,
+                              ),
+                            );
+                            valueController.changeDestinationAddressMarker();
+                          },
+                          child: Text('Confirmar'),
+                        )
+                      ],
+                    ),
+                  ),
                 ],
               );
             },
@@ -114,47 +221,93 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 }
 
-class AddressesWidget extends StatefulWidget {
-  const AddressesWidget({Key? key}) : super(key: key);
+class ListAddressWidget extends StatelessWidget {
+  final List<Placemark> address;
+  final Function(Placemark e) onSelected;
+  const ListAddressWidget(
+      {Key? key, required this.address, required this.onSelected})
+      : super(key: key);
 
-  @override
-  State<AddressesWidget> createState() => _AddressesWidgetState();
-}
-
-class _AddressesWidgetState extends State<AddressesWidget> {
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
+      height: MediaQuery.of(context).size.height,
       width: MediaQuery.of(context).size.width,
-      height: MediaQuery.of(context).size.height * .3,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.5),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            ...address.map(
+              (e) => InkWell(
+                onTap: () {
+                  onSelected(e);
+                },
+                child: Column(
+                  children: [
+                    AddressWidget(address: e),
+                    Divider(),
+                  ],
+                ),
+              ),
+            )
+          ],
+        ),
       ),
-      padding: EdgeInsets.symmetric(horizontal: 30),
-      child: Column(
-        children: const [
-          SizedBox(height: 8),
-          Text('Endereços'),
-          SizedBox(height: 8),
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'Origem',
-              border: OutlineInputBorder(),
-            ),
+    );
+  }
+}
+
+class AddressWidget extends StatelessWidget {
+  final Placemark address;
+  const AddressWidget({Key? key, required this.address}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 50,
+      child: ListTile(
+        title: Text(
+          "${address.street}, CEP: ${address.postalCode}, ${address.locality}  - ${address.administrativeArea}",
+        ),
+      ),
+    );
+  }
+}
+
+class TextFieldWidget extends StatelessWidget {
+  final TextEditingController? controller;
+  final String? hintText;
+  final String? labelText;
+  final Widget? suffixIcon;
+  final Function(String? e)? onChange;
+  final VoidCallback? onTap;
+  const TextFieldWidget({
+    Key? key,
+    this.controller,
+    this.hintText,
+    this.labelText,
+    this.onChange,
+    this.suffixIcon,
+    this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 50,
+      child: TextField(
+        controller: controller,
+        onChanged: onChange,
+        onTap: onTap,
+        style: TextStyle(fontSize: 12),
+        decoration: InputDecoration(
+          hintText: hintText,
+          labelText: labelText,
+          suffixIcon: suffixIcon,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: BorderSide(width: 2, color: Colors.green.shade300),
           ),
-          SizedBox(height: 8),
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'Destino',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: null,
-            child: Text('Confirmar'),
-          )
-        ],
+        ),
       ),
     );
   }
