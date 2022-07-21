@@ -194,8 +194,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                                 .text.isNotEmpty &&
                                             addressDestinationEditingController
                                                 .text.isNotEmpty
-                                        ? () {
-                                            valueController.changePolylines(
+                                        ? () async {
+                                            await valueController
+                                                .changePolylines(
                                               latLng1: LatLng(
                                                   valueController
                                                       .locationOrigin!.latitude,

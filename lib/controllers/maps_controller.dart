@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_routes/helpers/image_to_bytes.dart';
@@ -22,6 +23,9 @@ class MapsController extends ChangeNotifier {
   Position? lastPosition;
   Set<Marker> markers = <Marker>{};
   Set<Polyline> polylines = <Polyline>{};
+  PolylinePoints polylinePoints = PolylinePoints();
+  List<LatLng> polylineCoordinates = [];
+
   bool isLoading = false;
   late bool locationIsEnable;
   bool isLoadingAddresses = false;
@@ -29,10 +33,9 @@ class MapsController extends ChangeNotifier {
   Set<Placemark> addressesPlaceMarks = {};
   Map<Location?, Placemark?>? _placeAddressOrigin = {};
   Map<Location?, Placemark?>? _placeAddressDestination = {};
-
   Location? get locationOrigin => _placeAddressOrigin?.keys.first;
-  Placemark? get placeMarkOrigin => _placeAddressOrigin?.values.first;
   Location? get locationDestination => _placeAddressDestination?.keys.first;
+  Placemark? get placeMarkOrigin => _placeAddressOrigin?.values.first;
   Placemark? get placeMarkDestination => _placeAddressDestination?.values.first;
 
   String get addressOrigin => _placeAddressOrigin != null
@@ -41,7 +44,7 @@ class MapsController extends ChangeNotifier {
   String get addressDestination => _placeAddressDestination != null
       ? "${_placeAddressDestination?.values.first?.street}, ${_placeAddressDestination?.values.first?.subThoroughfare}, ${_placeAddressDestination?.values.first?.subLocality}, CEP: ${_placeAddressDestination?.values.first?.postalCode} - ${_placeAddressDestination?.values.first?.subAdministrativeArea}/${_placeAddressDestination?.values.first?.administrativeArea}}"
       : '';
-  
+
   listenPosition() {
     Geolocator.getPositionStream(
       locationSettings: LocationSettings(
@@ -310,18 +313,30 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  changePolylines({
+  Future<void> changePolylines({
     required LatLng latLng1,
     required LatLng latLng2,
-  }) {
+  }) async {
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+      'AIzaSyCwaNOwrJ3bgX5rslX7vI32LtDRu_KeWHU',
+      PointLatLng(
+        latLng1.latitude,
+        latLng1.latitude,
+      ),
+      PointLatLng(
+        latLng2.latitude,
+        latLng2.longitude,
+      ),
+      travelMode: TravelMode.transit,
+    );
+    for (var point in result.points) {
+      polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+    }
     Polyline polyline = Polyline(
-      polylineId: PolylineId(latLng1.hashCode.toString()),
+      polylineId: PolylineId("${latLng1.toString()}-${latLng2.toString()}"),
       color: Colors.blue,
       jointType: JointType.bevel,
-      points: [
-        latLng1,
-        latLng2,
-      ],
+      points: [...polylineCoordinates],
     );
     polylines.add(polyline);
     _animatedCameraToLatings(latLng1, latLng2, 120);
