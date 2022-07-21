@@ -36,7 +36,10 @@ class _SearchAddressPageState extends State<SearchAddressPage> {
                         hintText: widget.hint,
                       ),
                       onChanged: (e) async {
-                        await valueController.searchAddress(e);
+                        await Future.delayed(Duration(milliseconds: 3000)).then(
+                          (value) async =>
+                              await valueController.searchAddress(e),
+                        );
                       },
                     ),
                     Expanded(
