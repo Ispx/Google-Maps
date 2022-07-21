@@ -22,9 +22,9 @@ class MapsController extends ChangeNotifier {
   Position? lastPosition;
   Set<Marker> markers = <Marker>{};
   Set<Polyline> polylines = <Polyline>{};
-  bool isLoadingInit = false;
+  bool isLoading = false;
   late bool locationIsEnable;
-  bool searchingAddress = false;
+  bool isLoadingAddresses = false;
   Map<Location, List<Placemark>> mapLocationPlaceMark = {};
   Set<Placemark> addressesPlaceMarks = {};
   Map<Location?, Placemark?>? _placeAddressOrigin = {};
@@ -52,7 +52,7 @@ class MapsController extends ChangeNotifier {
       (Position? position) {
         lastPosition = position;
         if (position != null) {
-          animatedCameraAndMyMarkerPosition(
+          _animatedCameraAndMyMarkerPosition(
             LatLng(position.latitude, position.longitude),
           );
         }
@@ -93,7 +93,7 @@ class MapsController extends ChangeNotifier {
         .first
         .key;
     _placeAddressOrigin?.addAll({location: address});
-    _clearStorageAddressSearched();
+    _clearAddressSearchMemoryStore();
     notifyListeners();
   }
 
@@ -105,12 +105,12 @@ class MapsController extends ChangeNotifier {
         .first
         .key;
     _placeAddressDestination?.addAll({location: address});
-    _clearStorageAddressSearched();
+    _clearAddressSearchMemoryStore();
     notifyListeners();
   }
 
   _initController() async {
-    _changeLoadingInit(true);
+    _changeLoading(true);
     changeLocationServiceIsEnable(
         (await Geolocator.isLocationServiceEnabled()));
     var imageInBytes = await imageToBytes(
@@ -122,7 +122,7 @@ class MapsController extends ChangeNotifier {
     iconBitMap.complete(BitmapDescriptor.fromBytes(imageInBytes));
     await _initCameraPosition();
     await _initLocationSettings();
-    _changeLoadingInit(false);
+    _changeLoading(false);
     listenPosition();
     listenLocationService();
   }
@@ -165,8 +165,8 @@ class MapsController extends ChangeNotifier {
     }
   }
 
-  _changeLoadingInit(bool isLoading) {
-    isLoadingInit = isLoading;
+  _changeLoading(bool isLoading) {
+    this.isLoading = isLoading;
     notifyListeners();
   }
 
@@ -192,12 +192,12 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  changeSearchingAddress(bool isTrue) {
-    searchingAddress = isTrue;
+  _changeIsLoadingAddresses(bool isTrue) {
+    isLoadingAddresses = isTrue;
     notifyListeners();
   }
 
-  _clearStorageAddressSearched() {
+  _clearAddressSearchMemoryStore() {
     mapLocationPlaceMark = {};
     addressesPlaceMarks.clear();
   }
@@ -210,7 +210,7 @@ class MapsController extends ChangeNotifier {
   Future<void> searchAddress(String address) async {
     mapLocationPlaceMark = {};
     try {
-      changeSearchingAddress(true);
+      _changeIsLoadingAddresses(true);
       final locations =
           await locationFromAddress(address, localeIdentifier: 'pt_BR');
       for (var location in locations) {
@@ -225,12 +225,14 @@ class MapsController extends ChangeNotifier {
     } catch (e) {
       print(e.toString());
     } finally {
-      changeSearchingAddress(false);
+      _changeIsLoadingAddresses(false);
       notifyListeners();
     }
   }
 
-  _changeMyMarkerPosition(LatLng latLng) async {
+  _changeMyMarkerPosition(
+    LatLng latLng,
+  ) async {
     double rotation = 0;
     if (lastPosition != null) {
       rotation = Geolocator.bearingBetween(
@@ -263,7 +265,7 @@ class MapsController extends ChangeNotifier {
     markers.add(marker);
   }
 
-  animatedCameraTwoLating(
+  _animatedCameraToLatings(
       LatLng fromLocationLatLng, LatLng toLocationLatLng, double zoom) {
     final cameraUpdate = CameraUpdate.newLatLngBounds(
       LatLngBounds(
@@ -290,7 +292,7 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  animatedCameraAndMyMarkerPosition(LatLng latLng) {
+  _animatedCameraAndMyMarkerPosition(LatLng latLng) {
     _changeMyMarkerPosition(latLng);
     if (mapController != null) {
       final cameraUpdate = CameraUpdate.newLatLngZoom(
@@ -322,10 +324,10 @@ class MapsController extends ChangeNotifier {
       ],
     );
     polylines.add(polyline);
-    animatedCameraTwoLating(latLng1, latLng2, 120);
+    _animatedCameraToLatings(latLng1, latLng2, 120);
   }
 
-  changeOriginAddressMarker() {
+  changeMarkerOriginAddress() {
     markers.add(
       Marker(
         markerId: MarkerId('origin-address-marker'),
@@ -340,7 +342,7 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  changeDestinationAddressMarker() {
+  changeMarkerDestinationAddress() {
     markers.add(
       Marker(
         markerId: MarkerId('destination-address-marker'),
@@ -358,8 +360,9 @@ class MapsController extends ChangeNotifier {
 
   void getCurrentLocation() async {
     final position = await Geolocator.getCurrentPosition();
-    await animatedCameraAndMyMarkerPosition(
-        LatLng(position.latitude, position.longitude));
+    await _animatedCameraAndMyMarkerPosition(
+      LatLng(position.latitude, position.longitude),
+    );
   }
 
   onRequestPermission() async {
@@ -368,7 +371,7 @@ class MapsController extends ChangeNotifier {
       if (permission == LocationPermission.always ||
           permission == LocationPermission.whileInUse) {
         final position = await Geolocator.getCurrentPosition();
-        animatedCameraAndMyMarkerPosition(
+        _animatedCameraAndMyMarkerPosition(
             LatLng(position.latitude, position.longitude));
         changeLocationServiceIsEnable(true);
       }
@@ -428,7 +431,7 @@ class MapsController extends ChangeNotifier {
       );
     }
 
-    animatedCameraAndMyMarkerPosition(
+    _animatedCameraAndMyMarkerPosition(
       LatLng(position.latitude, position.longitude),
     );
   }

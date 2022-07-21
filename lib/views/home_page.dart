@@ -54,7 +54,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           value: controller,
           builder: (context, _) => Consumer<MapsController>(
             builder: (context, valueController, child) {
-              if (valueController.isLoadingInit) {
+              if (valueController.isLoading) {
                 return Center(
                   child: CircularProgressIndicator(),
                 );
@@ -181,7 +181,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 valueController.locationDestination!.longitude,
                               ),
                             );
-                            valueController.changeDestinationAddressMarker();
+                            valueController.changeMarkerDestinationAddress();
                           },
                           child: Text('Confirmar'),
                         )
