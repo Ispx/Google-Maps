@@ -194,27 +194,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                                 .text.isNotEmpty &&
                                             addressDestinationEditingController
                                                 .text.isNotEmpty
-                                        ? () async {
-                                            await valueController
-                                                .changePolylines(
-                                              latLng1: LatLng(
-                                                  valueController
-                                                      .locationOrigin!.latitude,
-                                                  valueController
-                                                      .locationOrigin!
-                                                      .longitude),
-                                              latLng2: LatLng(
-                                                valueController
-                                                    .locationDestination!
-                                                    .latitude,
-                                                valueController
-                                                    .locationDestination!
-                                                    .longitude,
-                                              ),
-                                            );
-                                            valueController
-                                                .changeMarkerDestinationAddress();
-                                          }
+                                        ? () async => await valueController
+                                            .onConfirmRouters()
                                         : null,
                                     child: Text('Confirmar'),
                                   ),

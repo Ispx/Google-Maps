@@ -17,6 +17,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
+      debugShowCheckedModeBanner: false,
       initialRoute: Routes.SPLASH,
       onGenerateRoute: (onRouter) {
         var routerName = onRouter.name;

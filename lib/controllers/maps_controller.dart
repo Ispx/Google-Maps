@@ -7,7 +7,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_routes/helpers/image_to_bytes.dart';
 import 'package:geocoding/geocoding.dart';
-
 import '../utils/map_style_util.dart';
 
 class MapsController extends ChangeNotifier {
@@ -313,15 +312,29 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  onConfirmRouters() async {
+    await changePolylines(
+      latLng1: LatLng(
+        locationOrigin!.latitude,
+        locationOrigin!.longitude,
+      ),
+      latLng2: LatLng(
+        locationDestination!.latitude,
+        locationDestination!.longitude,
+      ),
+    );
+    changeMarkerDestinationAddress();
+  }
+
   Future<void> changePolylines({
     required LatLng latLng1,
     required LatLng latLng2,
   }) async {
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      'AIzaSyCwaNOwrJ3bgX5rslX7vI32LtDRu_KeWHU',
+      'AIzaSyDhSFZrpQ6qz4Ssbzj61mdAd7LaGJ1_dgk',
       PointLatLng(
         latLng1.latitude,
-        latLng1.latitude,
+        latLng1.longitude,
       ),
       PointLatLng(
         latLng2.latitude,
