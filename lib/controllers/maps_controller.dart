@@ -38,10 +38,10 @@ class MapsController extends ChangeNotifier {
   Placemark? get placeMarkDestination => _placeAddressDestination?.values.first;
 
   String get addressOrigin => _placeAddressOrigin != null
-      ? "${_placeAddressOrigin?.values.first?.street}, ${_placeAddressOrigin?.values.first?.subThoroughfare}, ${_placeAddressOrigin?.values.first?.subLocality}, CEP: ${_placeAddressOrigin?.values.first?.postalCode} - ${_placeAddressOrigin?.values.first?.subAdministrativeArea}/${_placeAddressOrigin?.values.first?.administrativeArea}}"
+      ? "${_placeAddressOrigin?.values.first?.street}, ${_placeAddressOrigin?.values.first?.subThoroughfare}, ${_placeAddressOrigin?.values.first?.subLocality}, CEP: ${_placeAddressOrigin?.values.first?.postalCode} - ${_placeAddressOrigin?.values.first?.subAdministrativeArea}/${_placeAddressOrigin?.values.first?.administrativeArea}"
       : '';
   String get addressDestination => _placeAddressDestination != null
-      ? "${_placeAddressDestination?.values.first?.street}, ${_placeAddressDestination?.values.first?.subThoroughfare}, ${_placeAddressDestination?.values.first?.subLocality}, CEP: ${_placeAddressDestination?.values.first?.postalCode} - ${_placeAddressDestination?.values.first?.subAdministrativeArea}/${_placeAddressDestination?.values.first?.administrativeArea}}"
+      ? "${_placeAddressDestination?.values.first?.street}, ${_placeAddressDestination?.values.first?.subThoroughfare}, ${_placeAddressDestination?.values.first?.subLocality}, CEP: ${_placeAddressDestination?.values.first?.postalCode} - ${_placeAddressDestination?.values.first?.subAdministrativeArea}/${_placeAddressDestination?.values.first?.administrativeArea}"
       : '';
 
   listenPosition() {
