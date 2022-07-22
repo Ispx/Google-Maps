@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -25,6 +26,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _changeSystemUiOverlay(SystemUiMode.leanBack);
     controller = MapsController();
   }
 
@@ -36,6 +38,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         await Geolocator.isLocationServiceEnabled(),
       );
     }
+  }
+
+  _changeSystemUiOverlay(SystemUiMode systemUiMode) {
+    SystemChrome.setEnabledSystemUIMode(systemUiMode);
   }
 
   @override
