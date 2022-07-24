@@ -7,6 +7,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_routes/helpers/image_to_bytes.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:maps_launcher/maps_launcher.dart';
+import '../helpers/search_router_state_helper.dart';
 import '../utils/map_style_util.dart';
 
 class MapsController extends ChangeNotifier {
@@ -24,7 +26,7 @@ class MapsController extends ChangeNotifier {
   Set<Polyline> polylines = <Polyline>{};
   PolylinePoints polylinePoints = PolylinePoints();
   List<LatLng> polylineCoordinates = [];
-
+  SearchRouterStateHelper searchRouteState = SearchRouterStateHelper.INIT;
   bool isLoading = false;
   late bool locationIsEnable;
   bool isLoadingAddresses = false;
@@ -60,6 +62,11 @@ class MapsController extends ChangeNotifier {
         }
       },
     );
+  }
+
+  _changeRouterState(SearchRouterStateHelper state) {
+    searchRouteState = state;
+    notifyListeners();
   }
 
   listenLocationService() {
@@ -210,6 +217,8 @@ class MapsController extends ChangeNotifier {
   }
 
   Future<void> searchAddress(String address) async {
+    _changeRouterState(SearchRouterStateHelper.INIT);
+
     mapLocationPlaceMark = {};
     try {
       _changeIsLoadingAddresses(true);
@@ -244,8 +253,7 @@ class MapsController extends ChangeNotifier {
         latLng.longitude,
       );
     }
-    markers.removeWhere(
-        (element) => element.markerId.value == 'my-marker-position');
+    _removeMarkerByIds('my-marker-position');
     Marker marker = Marker(
       markerId: MarkerId('my-marker-position'),
       icon: await iconBitMap.future,
@@ -312,7 +320,19 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  onInitRouter() async {
+    try {
+      await MapsLauncher.launchCoordinates(
+        locationDestination!.latitude,
+        locationDestination!.longitude,
+      );
+    } catch (e) {
+      print(e.toString());
+    }
+  }
+
   onConfirmRouters() async {
+    _changeRouterState(SearchRouterStateHelper.SEARCHING);
     await changePolylines(
       latLng1: LatLng(
         locationOrigin!.latitude,
@@ -323,7 +343,8 @@ class MapsController extends ChangeNotifier {
         locationDestination!.longitude,
       ),
     );
-    changeMarkerDestinationAddress();
+    _changeMarkerDestinationAddress();
+    _changeRouterState(SearchRouterStateHelper.DONE);
   }
 
   Future<void> changePolylines({
@@ -345,8 +366,9 @@ class MapsController extends ChangeNotifier {
     for (var point in result.points) {
       polylineCoordinates.add(LatLng(point.latitude, point.longitude));
     }
+    _removePolylinesByIds("origin-and-destination-coordenates");
     Polyline polyline = Polyline(
-      polylineId: PolylineId("${latLng1.toString()}-${latLng2.toString()}"),
+      polylineId: PolylineId("origin-and-destination-coordenates"),
       color: Colors.blue,
       jointType: JointType.bevel,
       points: [...polylineCoordinates],
@@ -355,7 +377,18 @@ class MapsController extends ChangeNotifier {
     _animatedCameraToLatings(latLng1, latLng2, 120);
   }
 
+  _removeMarkerByIds(String id) {
+    markers.removeWhere((element) => element.mapsId.value == id);
+    notifyListeners();
+  }
+
+  _removePolylinesByIds(String id) {
+    polylines.removeWhere((element) => element.polylineId.value == id);
+    notifyListeners();
+  }
+
   changeMarkerOriginAddress() {
+    _removeMarkerByIds('origin-address-marker');
     markers.add(
       Marker(
         markerId: MarkerId('origin-address-marker'),
@@ -370,7 +403,8 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  changeMarkerDestinationAddress() {
+  _changeMarkerDestinationAddress() {
+    _removeMarkerByIds('destination-address-marker');
     markers.add(
       Marker(
         markerId: MarkerId('destination-address-marker'),

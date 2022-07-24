@@ -4,6 +4,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_routes/controllers/maps_controller.dart';
+import 'package:google_maps_routes/helpers/search_router_state_helper.dart';
 import 'package:google_maps_routes/utils/routers.dart';
 import 'package:provider/provider.dart';
 
@@ -200,10 +201,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                                 .text.isNotEmpty &&
                                             addressDestinationEditingController
                                                 .text.isNotEmpty
-                                        ? () async => await valueController
-                                            .onConfirmRouters()
+                                        ? valueController.searchRouteState ==
+                                                SearchRouterStateHelper.DONE
+                                            ? () async => await valueController
+                                                .onInitRouter()
+                                            : () async => await valueController
+                                                .onConfirmRouters()
                                         : null,
-                                    child: Text('Confirmar'),
+                                    child: Text(
+                                      valueController
+                                          .searchRouteState.getDescription,
+                                    ),
                                   ),
                                 )
                               ],
