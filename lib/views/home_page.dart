@@ -41,6 +41,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
   _changeSystemUiOverlay(SystemUiMode systemUiMode) {
     SystemChrome.setEnabledSystemUIMode(systemUiMode);
   }
@@ -295,12 +301,10 @@ class AddressWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 50,
-      child: ListTile(
-        title: Text(
-          "${address.street}, ${address.subThoroughfare}, ${address.subLocality}, CEP: ${address.postalCode} - ${address.subAdministrativeArea}/${address.administrativeArea}",
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(
+        "${address.street}, ${address.subThoroughfare}, ${address.subLocality}, CEP: ${address.postalCode} - ${address.subAdministrativeArea}/${address.administrativeArea}",
       ),
     );
   }

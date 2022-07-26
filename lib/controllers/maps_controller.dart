@@ -16,6 +16,8 @@ class MapsController extends ChangeNotifier {
   static final MapsController _instance = MapsController._();
   MapsController._() {
     _initController();
+    _onListenLocationSearchStream();
+    _onListenSearchStream();
   }
   Completer<BitmapDescriptor> iconBitMap = Completer<BitmapDescriptor>();
   GoogleMapController? mapController;
@@ -29,56 +31,104 @@ class MapsController extends ChangeNotifier {
   SearchRouterStateHelper searchRouteState = SearchRouterStateHelper.INIT;
   bool isLoading = false;
   late bool locationIsEnable;
-  bool isLoadingAddresses = false;
   Map<Location, List<Placemark>> mapLocationPlaceMark = {};
-  Set<Placemark> addressesPlaceMarks = {};
   Map<Location?, Placemark?>? _placeAddressOrigin = {};
   Map<Location?, Placemark?>? _placeAddressDestination = {};
   Location? get locationOrigin => _placeAddressOrigin?.keys.first;
   Location? get locationDestination => _placeAddressDestination?.keys.first;
   Placemark? get placeMarkOrigin => _placeAddressOrigin?.values.first;
   Placemark? get placeMarkDestination => _placeAddressDestination?.values.first;
-
+  StreamController<List<Location>> streamLocationSearchController =
+      StreamController();
+  StreamController<MapEntry<Location, Set<Placemark>>> streamSearchController =
+      StreamController();
+  Stream<Map<Location, List<Placemark>>> get streamSearch =>
+      streamSearchController.stream
+          .map((event) => {event.key: event.value.toList()});
   String get addressOrigin => _placeAddressOrigin != null
       ? "${_placeAddressOrigin?.values.first?.street}, ${_placeAddressOrigin?.values.first?.subThoroughfare}, ${_placeAddressOrigin?.values.first?.subLocality}, CEP: ${_placeAddressOrigin?.values.first?.postalCode} - ${_placeAddressOrigin?.values.first?.subAdministrativeArea}/${_placeAddressOrigin?.values.first?.administrativeArea}"
       : '';
   String get addressDestination => _placeAddressDestination != null
       ? "${_placeAddressDestination?.values.first?.street}, ${_placeAddressDestination?.values.first?.subThoroughfare}, ${_placeAddressDestination?.values.first?.subLocality}, CEP: ${_placeAddressDestination?.values.first?.postalCode} - ${_placeAddressDestination?.values.first?.subAdministrativeArea}/${_placeAddressDestination?.values.first?.administrativeArea}"
       : '';
-
-  listenPosition() {
-    Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10,
-      ),
-    ).listen(
-      (Position? position) {
-        lastPosition = position;
-        if (position != null) {
-          _animatedCameraAndMyMarkerPosition(
-            LatLng(position.latitude, position.longitude),
-          );
-        }
-      },
-    );
-  }
+  List<Placemark> get placemarks => mapLocationPlaceMark.values.single;
 
   _changeRouterState(SearchRouterStateHelper state) {
     searchRouteState = state;
     notifyListeners();
   }
 
-  listenLocationService() {
-    Geolocator.getServiceStatusStream().listen(
-      (status) => changeLocationServiceIsEnable(
-        status == ServiceStatus.enabled,
+  changeMarkerOriginAddress() {
+    _removeMarkerByIds('origin-address-marker');
+    markers.add(
+      Marker(
+        markerId: MarkerId('origin-address-marker'),
+        position: LatLng(_placeAddressOrigin?.keys.first?.latitude ?? 0.0,
+            _placeAddressOrigin?.keys.first?.longitude ?? 0.0),
+        infoWindow: InfoWindow(
+          title: 'Origem',
+          snippet: addressOrigin,
+        ),
       ),
     );
+    notifyListeners();
+  }
+
+  _changeMarkerDestinationAddress() {
+    _removeMarkerByIds('destination-address-marker');
+    markers.add(
+      Marker(
+        markerId: MarkerId('destination-address-marker'),
+        position: LatLng(_placeAddressDestination?.keys.first?.latitude ?? 0.0,
+            _placeAddressDestination?.keys.first?.longitude ?? 0.0),
+        infoWindow: InfoWindow(
+          title: 'Destino',
+          snippet: addressDestination,
+        ),
+        icon: BitmapDescriptor.defaultMarker,
+      ),
+    );
+    notifyListeners();
   }
 
   changeLocationServiceIsEnable(bool isTrue) {
     locationIsEnable = isTrue;
+    notifyListeners();
+  }
+
+  Future<void> changePolylines({
+    required LatLng latLng1,
+    required LatLng latLng2,
+  }) async {
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+      'AIzaSyDhSFZrpQ6qz4Ssbzj61mdAd7LaGJ1_dgk',
+      PointLatLng(
+        latLng1.latitude,
+        latLng1.longitude,
+      ),
+      PointLatLng(
+        latLng2.latitude,
+        latLng2.longitude,
+      ),
+      travelMode: TravelMode.transit,
+    );
+    for (var point in result.points) {
+      polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+    }
+    _removePolylinesByIds("origin-and-destination-coordenates");
+    Polyline polyline = Polyline(
+      polylineId: PolylineId("origin-and-destination-coordenates"),
+      color: Colors.blue,
+      jointType: JointType.bevel,
+      points: [...polylineCoordinates],
+    );
+    polylines.add(polyline);
+    _animatedCameraToLatings(latLng1, latLng2, 120);
+  }
+
+  changeMapsController(GoogleMapController controller) async {
+    controller.setMapStyle(jsonEncode(mapStyleUtil));
+    mapController = controller;
     notifyListeners();
   }
 
@@ -118,62 +168,6 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  _initController() async {
-    _changeLoading(true);
-    changeLocationServiceIsEnable(
-        (await Geolocator.isLocationServiceEnabled()));
-    var imageInBytes = await imageToBytes(
-      'assets/images/cargo_truck.png', // 'assets/images/cargo_truck.png',
-      targetHeight: 60,
-      targetWidth: 60,
-      //fromNetwork: true,
-    ); //'https://cdn-icons-png.flaticon.com/512/713/713311.png'
-    iconBitMap.complete(BitmapDescriptor.fromBytes(imageInBytes));
-    await _initCameraPosition();
-    await _initLocationSettings();
-    _changeLoading(false);
-    listenPosition();
-    listenLocationService();
-  }
-
-  Future<void> _initLocationSettings() async {
-    try {
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        locationSettings = AndroidSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 50,
-          forceLocationManager: true,
-          intervalDuration: const Duration(seconds: 10),
-          //(Optional) Set foreground notification config to keep the app alive
-          //when going to the background
-          foregroundNotificationConfig: const ForegroundNotificationConfig(
-            notificationText:
-                "Example app will continue to receive your location even when you aren't using it",
-            notificationTitle: "Rodando em Background",
-            enableWakeLock: true,
-          ),
-        );
-      } else if (defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.macOS) {
-        locationSettings = AppleSettings(
-          accuracy: LocationAccuracy.high,
-          activityType: ActivityType.fitness,
-          distanceFilter: 50,
-          pauseLocationUpdatesAutomatically: true,
-          // Only set to true if our app will be started up in the background.
-          showBackgroundLocationIndicator: false,
-        );
-      } else {
-        locationSettings = LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 100,
-        );
-      }
-    } catch (e) {
-      print(e.toString());
-    }
-  }
-
   _changeLoading(bool isLoading) {
     this.isLoading = isLoading;
     notifyListeners();
@@ -201,14 +195,8 @@ class MapsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  _changeIsLoadingAddresses(bool isTrue) {
-    isLoadingAddresses = isTrue;
-    notifyListeners();
-  }
-
   _clearAddressSearchMemoryStore() {
     mapLocationPlaceMark = {};
-    addressesPlaceMarks.clear();
   }
 
   Future<Position> currentPosition() async {
@@ -216,27 +204,15 @@ class MapsController extends ChangeNotifier {
         desiredAccuracy: LocationAccuracy.high);
   }
 
-  Future<void> searchAddress(String address) async {
-    _changeRouterState(SearchRouterStateHelper.INIT);
-
-    mapLocationPlaceMark = {};
+  Future<void> searhAddress(String address) async {
+    _changeRouterState(SearchRouterStateHelper.SEARCHING);
     try {
-      _changeIsLoadingAddresses(true);
-      final locations =
-          await locationFromAddress(address, localeIdentifier: 'pt_BR');
-      for (var location in locations) {
-        var places = (await placemarkFromCoordinates(
-                location.latitude, location.longitude,
-                localeIdentifier: 'pt_BR'))
-            .toSet();
-        var values = places.map((e) => MapEntry(location, [...places]));
-        mapLocationPlaceMark.addEntries(values);
-        addressesPlaceMarks.addAll(places);
-      }
+      streamLocationSearchController.sink
+          .add(await locationFromAddress(address, localeIdentifier: 'pt_BR'));
     } catch (e) {
       print(e.toString());
     } finally {
-      _changeIsLoadingAddresses(false);
+      _changeRouterState(SearchRouterStateHelper.INIT);
       notifyListeners();
     }
   }
@@ -314,21 +290,17 @@ class MapsController extends ChangeNotifier {
     }
   }
 
-  changeMapsController(GoogleMapController controller) async {
-    controller.setMapStyle(jsonEncode(mapStyleUtil));
-    mapController = controller;
-    notifyListeners();
-  }
-
   onInitRouter() async {
     try {
-      await MapsLauncher.launchCoordinates(
-        locationDestination!.latitude,
-        locationDestination!.longitude,
-      );
+      await MapsLauncher.launchQuery(addressDestination);
     } catch (e) {
       print(e.toString());
     }
+  }
+
+  closeStreams() {
+    streamLocationSearchController.close();
+    streamSearchController.close();
   }
 
   onConfirmRouters() async {
@@ -347,84 +319,10 @@ class MapsController extends ChangeNotifier {
     _changeRouterState(SearchRouterStateHelper.DONE);
   }
 
-  Future<void> changePolylines({
-    required LatLng latLng1,
-    required LatLng latLng2,
-  }) async {
-    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      'AIzaSyDhSFZrpQ6qz4Ssbzj61mdAd7LaGJ1_dgk',
-      PointLatLng(
-        latLng1.latitude,
-        latLng1.longitude,
-      ),
-      PointLatLng(
-        latLng2.latitude,
-        latLng2.longitude,
-      ),
-      travelMode: TravelMode.transit,
-    );
-    for (var point in result.points) {
-      polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-    }
-    _removePolylinesByIds("origin-and-destination-coordenates");
-    Polyline polyline = Polyline(
-      polylineId: PolylineId("origin-and-destination-coordenates"),
-      color: Colors.blue,
-      jointType: JointType.bevel,
-      points: [...polylineCoordinates],
-    );
-    polylines.add(polyline);
-    _animatedCameraToLatings(latLng1, latLng2, 120);
-  }
-
-  _removeMarkerByIds(String id) {
-    markers.removeWhere((element) => element.mapsId.value == id);
+  onTap(LatLng latLng) async {
+    setMarkerPosition(latLng);
+    await newCameraPosition(latLng);
     notifyListeners();
-  }
-
-  _removePolylinesByIds(String id) {
-    polylines.removeWhere((element) => element.polylineId.value == id);
-    notifyListeners();
-  }
-
-  changeMarkerOriginAddress() {
-    _removeMarkerByIds('origin-address-marker');
-    markers.add(
-      Marker(
-        markerId: MarkerId('origin-address-marker'),
-        position: LatLng(_placeAddressOrigin?.keys.first?.latitude ?? 0.0,
-            _placeAddressOrigin?.keys.first?.longitude ?? 0.0),
-        infoWindow: InfoWindow(
-          title: 'Origem',
-          snippet: addressOrigin,
-        ),
-      ),
-    );
-    notifyListeners();
-  }
-
-  _changeMarkerDestinationAddress() {
-    _removeMarkerByIds('destination-address-marker');
-    markers.add(
-      Marker(
-        markerId: MarkerId('destination-address-marker'),
-        position: LatLng(_placeAddressDestination?.keys.first?.latitude ?? 0.0,
-            _placeAddressDestination?.keys.first?.longitude ?? 0.0),
-        infoWindow: InfoWindow(
-          title: 'Destino',
-          snippet: addressDestination,
-        ),
-        icon: BitmapDescriptor.defaultMarker,
-      ),
-    );
-    notifyListeners();
-  }
-
-  void getCurrentLocation() async {
-    final position = await Geolocator.getCurrentPosition();
-    await _animatedCameraAndMyMarkerPosition(
-      LatLng(position.latitude, position.longitude),
-    );
   }
 
   onRequestPermission() async {
@@ -443,10 +341,39 @@ class MapsController extends ChangeNotifier {
     }
   }
 
-  void onTap(LatLng latLng) async {
-    setMarkerPosition(latLng);
-    await newCameraPosition(latLng);
+  _removeMarkerByIds(String id) {
+    markers.removeWhere((element) => element.mapsId.value == id);
     notifyListeners();
+  }
+
+  _removePolylinesByIds(String id) {
+    polylines.removeWhere((element) => element.polylineId.value == id);
+    notifyListeners();
+  }
+
+  void getCurrentLocation() async {
+    final position = await Geolocator.getCurrentPosition();
+    await _animatedCameraAndMyMarkerPosition(
+      LatLng(position.latitude, position.longitude),
+    );
+  }
+
+  _initController() async {
+    _changeLoading(true);
+    changeLocationServiceIsEnable(
+        (await Geolocator.isLocationServiceEnabled()));
+    var imageInBytes = await imageToBytes(
+      'assets/images/cargo_truck.png', // 'assets/images/cargo_truck.png',
+      targetHeight: 60,
+      targetWidth: 60,
+      //fromNetwork: true,
+    ); //'https://cdn-icons-png.flaticon.com/512/713/713311.png'
+    iconBitMap.complete(BitmapDescriptor.fromBytes(imageInBytes));
+    await _initCameraPosition();
+    await _initLocationSettings();
+    _changeLoading(false);
+    listenPosition();
+    listenLocationService();
   }
 
   Future<void> _initCameraPosition() async {
@@ -496,5 +423,104 @@ class MapsController extends ChangeNotifier {
     _animatedCameraAndMyMarkerPosition(
       LatLng(position.latitude, position.longitude),
     );
+  }
+
+  Future<void> _initLocationSettings() async {
+    try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        locationSettings = AndroidSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 50,
+          forceLocationManager: true,
+          intervalDuration: const Duration(seconds: 10),
+          //(Optional) Set foreground notification config to keep the app alive
+          //when going to the background
+          foregroundNotificationConfig: const ForegroundNotificationConfig(
+            notificationText:
+                "Example app will continue to receive your location even when you aren't using it",
+            notificationTitle: "Rodando em Background",
+            enableWakeLock: true,
+          ),
+        );
+      } else if (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
+        locationSettings = AppleSettings(
+          accuracy: LocationAccuracy.high,
+          activityType: ActivityType.fitness,
+          distanceFilter: 50,
+          pauseLocationUpdatesAutomatically: true,
+          // Only set to true if our app will be started up in the background.
+          showBackgroundLocationIndicator: false,
+        );
+      } else {
+        locationSettings = LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 100,
+        );
+      }
+    } catch (e) {
+      print(e.toString());
+    }
+  }
+
+  listenPosition() {
+    Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    ).listen(
+      (Position? position) {
+        lastPosition = position;
+        if (position != null) {
+          _animatedCameraAndMyMarkerPosition(
+            LatLng(position.latitude, position.longitude),
+          );
+        }
+      },
+    );
+  }
+
+  listenLocationService() {
+    Geolocator.getServiceStatusStream().listen(
+      (status) => changeLocationServiceIsEnable(
+        status == ServiceStatus.enabled,
+      ),
+    );
+  }
+
+  _onListenSearchStream() {
+    streamSearch.listen(
+      (data) async {
+        mapLocationPlaceMark.clear();
+        mapLocationPlaceMark.addAll(data);
+        notifyListeners();
+      },
+    ).onError((e) {
+      print(e.toString());
+    });
+  }
+
+  _onListenLocationSearchStream() {
+    streamLocationSearchController.stream.listen(
+      (locations) async {
+        for (var location in locations) {
+          streamSearchController.sink.add(
+            MapEntry(
+              location,
+              (await placemarkFromCoordinates(
+                location.latitude,
+                location.longitude,
+                localeIdentifier: 'pt_BR',
+              ))
+                  .toSet(),
+            ),
+          );
+        }
+        notifyListeners();
+      },
+    ).onError((e) {
+      print(e.toString());
+    });
   }
 }

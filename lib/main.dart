@@ -8,6 +8,7 @@ import 'package:google_maps_routes/views/spash_page.dart';
 final navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
