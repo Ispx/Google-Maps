@@ -9,7 +9,9 @@
    <application
         android:label="google_maps_routes"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"
+        >
         <meta-data android:name="com.google.android.geo.API_KEY"
                android:value="AIzaSyAlM1pZZtF0c5-VxX9-zJ2Xe7cBgTBOWko"/>
         <activity

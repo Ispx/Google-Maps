@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1004305275981",
+    "project_id": "maps-routes-bce0e",
+    "storage_bucket": "maps-routes-bce0e.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1004305275981:android:0fc242f377b3a457855004",
+        "android_client_info": {
+          "package_name": "com.example.google_maps_routes"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1004305275981-5jf5lpkpp2emr4tc80ivkvpiv8cm4pqn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.google_maps_routes",
+            "certificate_hash": "035511e7a00d5347fc4cbabeefc00cebc5dcb00f"
+          }
+        },
+        {
+          "client_id": "1004305275981-0ube13rt90kdf4tbris2fb7696idqpdl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBX7pcnrveJ5A1hSU3yQgfGJU5DZC2YKdE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1004305275981-0ube13rt90kdf4tbris2fb7696idqpdl.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
