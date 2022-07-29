@@ -252,6 +252,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   Icons.location_on,
                 ),
               ),
+              FloatingActionButton(
+                onPressed: () async {},
+                child: Icon(
+                  Icons.add,
+                ),
+              ),
             ],
           ),
         ),
