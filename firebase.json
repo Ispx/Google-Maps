@@ -11,10 +11,13 @@
       "port": 5001
     },
     "firestore": {
-      "port": 8080
+      "port": 9001
     },
     "ui": {
       "enabled": true
     }
+  },
+  "functions": {
+    "source": "functions"
   }
 }

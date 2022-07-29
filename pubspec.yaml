@@ -43,7 +43,7 @@ dependencies:
   maps_launcher: ^2.0.1
   firebase_core: ^1.20.0
   cloud_functions: ^3.3.3
-  cloud_firestore: ^3.4.1
+  cloud_firestore: ^3.1.5
 
 dev_dependencies:
   flutter_test:
