@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_routes/controllers/auth_controller.dart';
 import 'package:google_maps_routes/controllers/permission_controller.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -14,13 +15,16 @@ class SplashPage extends StatefulWidget {
 
 class _SpashPageState extends State<SplashPage> {
   late final PermissionController permissionController;
+  late final AuthController authController;
   @override
   void initState() {
     super.initState();
+    authController = AuthController();
     permissionController = PermissionController(Permission.locationWhenInUse);
 
     Future.delayed(Duration(seconds: 3)).then(
       (e) async {
+        await authController.signInWithGoogle();
         permissionController.init();
       },
     );
