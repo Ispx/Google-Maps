@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
@@ -7,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_routes/helpers/image_to_bytes.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:google_maps_routes/helpers/router_status_helper.dart';
 import 'package:maps_launcher/maps_launcher.dart';
 import '../helpers/search_router_state_helper.dart';
 import '../utils/map_style_util.dart';
@@ -45,6 +48,7 @@ class MapsController extends ChangeNotifier {
   Stream<Map<Location, List<Placemark>>> get streamSearch =>
       streamSearchController.stream
           .map((event) => {event.key: event.value.toList()});
+  StreamController streamOnUpdateMyPositionInFirebase = StreamController();
   String get addressOrigin => _placeAddressOrigin != null
       ? "${_placeAddressOrigin?.values.first?.street}, ${_placeAddressOrigin?.values.first?.subThoroughfare}, ${_placeAddressOrigin?.values.first?.subLocality}, CEP: ${_placeAddressOrigin?.values.first?.postalCode} - ${_placeAddressOrigin?.values.first?.subAdministrativeArea}/${_placeAddressOrigin?.values.first?.administrativeArea}"
       : '';
@@ -52,6 +56,23 @@ class MapsController extends ChangeNotifier {
       ? "${_placeAddressDestination?.values.first?.street}, ${_placeAddressDestination?.values.first?.subThoroughfare}, ${_placeAddressDestination?.values.first?.subLocality}, CEP: ${_placeAddressDestination?.values.first?.postalCode} - ${_placeAddressDestination?.values.first?.subAdministrativeArea}/${_placeAddressDestination?.values.first?.administrativeArea}"
       : '';
   List<Placemark> get placemarks => mapLocationPlaceMark.values.single;
+
+  Future<bool> _updateMyPositionInFirebase(Position myPosition) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('routes')
+          .doc(FirebaseAuth.instance.currentUser!.uid)
+          .update(
+        {
+          "current-position": myPosition.toJson(),
+        },
+      );
+      return true;
+    } catch (e) {
+      debugPrint(e.toString());
+      return false;
+    }
+  }
 
   _changeRouterState(SearchRouterStateHelper state) {
     searchRouteState = state;
@@ -303,8 +324,42 @@ class MapsController extends ChangeNotifier {
     streamSearchController.close();
   }
 
+  Future<void> _registerRouterInFirebase(
+      {required LatLng origin, required LatLng destination}) async {
+    await FirebaseFirestore.instance
+        .collection('routes')
+        .doc(FirebaseAuth.instance.currentUser!.uid)
+        .set(
+      {
+        "routerId": "${origin.toString}-${destination.toString()}",
+        "name": FirebaseAuth.instance.currentUser?.displayName,
+        "email": FirebaseAuth.instance.currentUser?.email,
+        "origin": {
+          "lating": origin.toJson(),
+          "street": addressOrigin,
+        },
+        "destination": {
+          "lating": destination.toJson(),
+          "street": addressDestination,
+        },
+        "status": RouterStatusHelper.ONGOING.getString,
+        "createdAt": DateTime.now(),
+      },
+    );
+  }
+
   onConfirmRouters() async {
     _changeRouterState(SearchRouterStateHelper.SEARCHING);
+    await _registerRouterInFirebase(
+      origin: LatLng(
+        locationOrigin!.latitude,
+        locationOrigin!.longitude,
+      ),
+      destination: LatLng(
+        locationDestination!.latitude,
+        locationDestination!.longitude,
+      ),
+    );
     await changePolylines(
       latLng1: LatLng(
         locationOrigin!.latitude,
@@ -470,13 +525,16 @@ class MapsController extends ChangeNotifier {
         distanceFilter: 10,
       ),
     ).listen(
-      (Position? position) {
+      (Position? position) async {
         lastPosition = position;
         if (position != null) {
           _animatedCameraAndMyMarkerPosition(
             LatLng(position.latitude, position.longitude),
           );
         }
+        streamOnUpdateMyPositionInFirebase.sink.add(
+          await _updateMyPositionInFirebase(position!),
+        );
       },
     );
   }
