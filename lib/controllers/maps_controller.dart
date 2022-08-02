@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -12,8 +11,6 @@ import 'package:google_maps_routes/helpers/collections_helper.dart';
 import 'package:google_maps_routes/helpers/image_to_bytes.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_routes/helpers/router_status_helper.dart';
-import 'package:google_maps_routes/main.dart';
-import 'package:google_maps_routes/utils/routers.dart';
 import 'package:maps_launcher/maps_launcher.dart';
 import '../helpers/search_router_state_helper.dart';
 import '../utils/map_style_util.dart';
@@ -316,13 +313,12 @@ class MapsController extends ChangeNotifier {
   }
 
   onInitRouter() async {
-    try{
+    try {
       await MapsLauncher.launchQuery(addressDestination);
     } catch (e) {
       print(e.toString());
     }
   }
- 
 
   closeStreams() {
     streamLocationSearchController.close();
@@ -366,7 +362,6 @@ class MapsController extends ChangeNotifier {
         locationDestination!.longitude,
       ),
     );
-    /*
     await changePolylines(
       latLng1: LatLng(
         locationOrigin!.latitude,
@@ -377,7 +372,6 @@ class MapsController extends ChangeNotifier {
         locationDestination!.longitude,
       ),
     );
-    */
     _changeMarkerDestinationAddress();
     _changeRouterState(SearchRouterStateHelper.DONE);
   }
