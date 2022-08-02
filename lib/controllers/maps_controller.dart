@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -7,9 +8,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_maps_routes/helpers/collections_helper.dart';
 import 'package:google_maps_routes/helpers/image_to_bytes.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_routes/helpers/router_status_helper.dart';
+import 'package:google_maps_routes/main.dart';
+import 'package:google_maps_routes/utils/routers.dart';
 import 'package:maps_launcher/maps_launcher.dart';
 import '../helpers/search_router_state_helper.dart';
 import '../utils/map_style_util.dart';
@@ -60,7 +64,7 @@ class MapsController extends ChangeNotifier {
   Future<bool> _updateMyPositionInFirebase(Position myPosition) async {
     try {
       await FirebaseFirestore.instance
-          .collection('routes')
+          .collection(CollectionsHelper.IN_ROUTER.getString)
           .doc(FirebaseAuth.instance.currentUser!.uid)
           .update(
         {
@@ -312,12 +316,13 @@ class MapsController extends ChangeNotifier {
   }
 
   onInitRouter() async {
-    try {
+    try{
       await MapsLauncher.launchQuery(addressDestination);
     } catch (e) {
       print(e.toString());
     }
   }
+ 
 
   closeStreams() {
     streamLocationSearchController.close();
@@ -327,11 +332,11 @@ class MapsController extends ChangeNotifier {
   Future<void> _registerRouterInFirebase(
       {required LatLng origin, required LatLng destination}) async {
     await FirebaseFirestore.instance
-        .collection('routes')
+        .collection(CollectionsHelper.IN_ROUTER.getString)
         .doc(FirebaseAuth.instance.currentUser!.uid)
         .set(
       {
-        "routerId": "${origin.toString}-${destination.toString()}",
+        "userId": FirebaseAuth.instance.currentUser!.uid,
         "name": FirebaseAuth.instance.currentUser?.displayName,
         "email": FirebaseAuth.instance.currentUser?.email,
         "origin": {
@@ -342,6 +347,7 @@ class MapsController extends ChangeNotifier {
           "lating": destination.toJson(),
           "street": addressDestination,
         },
+        "polylines": [...polylineCoordinates],
         "status": RouterStatusHelper.ONGOING.getString,
         "createdAt": DateTime.now(),
       },
@@ -360,6 +366,7 @@ class MapsController extends ChangeNotifier {
         locationDestination!.longitude,
       ),
     );
+    /*
     await changePolylines(
       latLng1: LatLng(
         locationOrigin!.latitude,
@@ -370,6 +377,7 @@ class MapsController extends ChangeNotifier {
         locationDestination!.longitude,
       ),
     );
+    */
     _changeMarkerDestinationAddress();
     _changeRouterState(SearchRouterStateHelper.DONE);
   }
