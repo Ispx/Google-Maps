@@ -16,6 +16,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+  final scaffoldKey = GlobalKey<ScaffoldState>();
   late MapsController controller;
   TextEditingController addressOriginEditingController =
       TextEditingController();
@@ -55,6 +56,36 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
+        key: scaffoldKey,
+        drawer: Container(
+          width: MediaQuery.of(context).size.width * .5,
+          color: Colors.white,
+          child: Column(
+            children: const [
+              SizedBox(
+                height: 8,
+              ),
+              Text(
+                'Menu',
+              ),
+              SizedBox(
+                height: 16,
+              ),
+              ListTile(
+                title: Text('Histórico'),
+                trailing: Icon(
+                  Icons.arrow_forward,
+                ),
+              ),
+              ListTile(
+                title: Text('Sair do app'),
+                trailing: Icon(
+                  Icons.exit_to_app,
+                ),
+              ),
+            ],
+          ),
+        ),
         body: SizedBox(
           height: MediaQuery.of(context).size.height,
           width: MediaQuery.of(context).size.width,
@@ -97,131 +128,175 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       myLocationButtonEnabled: false,
                       zoomControlsEnabled: false,
                     ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: SizedBox(
-                        width: MediaQuery.of(context).size.width * .85,
-                        height: MediaQuery.of(context).size.height * .30,
-                        child: Card(
-                          color: Colors.grey.shade200,
-                          margin: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                Text(
-                                  'Pesquisar',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
+                    valueController.searchIsOpen
+                        ? Positioned(
+                            top: 90,
+                            child: SizedBox(
+                              width: MediaQuery.of(context).size.width * .85,
+                              height: MediaQuery.of(context).size.height * .30,
+                              child: Card(
+                                color: Colors.grey.shade200,
+                                margin: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
-                                TextFieldWidget(
-                                  controller: addressOriginEditingController,
-                                  key: ValueKey('origin'),
-                                  labelText: 'Origem',
-                                  hintText: 'Pesquisar endereço de início',
-                                  suffixIcon: IconButton(
-                                    onPressed: () async {
-                                      Position myPosition =
-                                          await valueController
-                                              .currentPosition();
-                                      Placemark placemark =
-                                          (await placemarkFromCoordinates(
-                                        myPosition.latitude,
-                                        myPosition.longitude,
-                                        localeIdentifier: 'pt_BR',
-                                      ))
-                                              .first;
-                                      valueController.setPlaceAddressOrigin(
-                                        placemark,
-                                        Location(
-                                          latitude: myPosition.latitude,
-                                          longitude: myPosition.longitude,
-                                          timestamp: myPosition.timestamp ??
-                                              DateTime.now(),
-                                        ),
-                                      );
-                                      addressOriginEditingController.text =
-                                          valueController.addressOrigin;
-                                    },
-                                    icon: Icon(
-                                      Icons.location_searching,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                  onTap: () async {
-                                    var result = await Navigator.pushNamed(
-                                      context,
-                                      Routes.SEARCH_ADDRESS,
-                                      arguments: 'Pesquisar endereço de início',
-                                    );
-                                    if (result != null) {
-                                      valueController
-                                          .setPlaceAddressOriginFromSearch(
-                                              result as Placemark);
-                                      addressOriginEditingController.text =
-                                          valueController.addressOrigin;
-                                    }
-                                  },
-                                ),
-                                TextFieldWidget(
-                                  controller:
-                                      addressDestinationEditingController,
-                                  key: ValueKey('destination'),
-                                  labelText: 'Destino',
-                                  hintText: 'Pesquisar endereço de destino',
-                                  onTap: () async {
-                                    var result = await Navigator.pushNamed(
-                                      context,
-                                      Routes.SEARCH_ADDRESS,
-                                      arguments:
-                                          'Pesquisar endereço de destino',
-                                    );
-                                    if (result != null) {
-                                      valueController
-                                          .setPlaceAddressDestinationFromSearch(
-                                              result as Placemark);
-                                      addressDestinationEditingController.text =
-                                          valueController.addressDestination;
-                                    }
-                                  },
-                                ),
-                                SizedBox(
-                                  width: double.maxFinite,
-                                  child: ElevatedButton(
-                                    style: ButtonStyle(
-                                      shape: MaterialStateProperty.resolveWith(
-                                        (states) => RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 12),
+                                  child: Column(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      Text(
+                                        'Pesquisar',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
                                         ),
                                       ),
-                                    ),
-                                    onPressed: addressOriginEditingController
-                                                .text.isNotEmpty &&
+                                      TextFieldWidget(
+                                        controller:
+                                            addressOriginEditingController,
+                                        key: ValueKey('origin'),
+                                        labelText: 'Origem',
+                                        hintText:
+                                            'Pesquisar endereço de início',
+                                        suffixIcon: IconButton(
+                                          onPressed: () async {
+                                            Position myPosition =
+                                                await valueController
+                                                    .currentPosition();
+                                            Placemark placemark =
+                                                (await placemarkFromCoordinates(
+                                              myPosition.latitude,
+                                              myPosition.longitude,
+                                              localeIdentifier: 'pt_BR',
+                                            ))
+                                                    .first;
+                                            valueController
+                                                .setPlaceAddressOrigin(
+                                              placemark,
+                                              Location(
+                                                latitude: myPosition.latitude,
+                                                longitude: myPosition.longitude,
+                                                timestamp:
+                                                    myPosition.timestamp ??
+                                                        DateTime.now(),
+                                              ),
+                                            );
+                                            addressOriginEditingController
+                                                    .text =
+                                                valueController.addressOrigin;
+                                          },
+                                          icon: Icon(
+                                            Icons.location_searching,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                        onTap: () async {
+                                          var result =
+                                              await Navigator.pushNamed(
+                                            context,
+                                            Routes.SEARCH_ADDRESS,
+                                            arguments:
+                                                'Pesquisar endereço de início',
+                                          );
+                                          if (result != null) {
+                                            valueController
+                                                .setPlaceAddressOriginFromSearch(
+                                                    result as Placemark);
+                                            addressOriginEditingController
+                                                    .text =
+                                                valueController.addressOrigin;
+                                          }
+                                        },
+                                      ),
+                                      TextFieldWidget(
+                                        controller:
+                                            addressDestinationEditingController,
+                                        key: ValueKey('destination'),
+                                        labelText: 'Destino',
+                                        hintText:
+                                            'Pesquisar endereço de destino',
+                                        onTap: () async {
+                                          var result =
+                                              await Navigator.pushNamed(
+                                            context,
+                                            Routes.SEARCH_ADDRESS,
+                                            arguments:
+                                                'Pesquisar endereço de destino',
+                                          );
+                                          if (result != null) {
+                                            valueController
+                                                .setPlaceAddressDestinationFromSearch(
+                                                    result as Placemark);
                                             addressDestinationEditingController
-                                                .text.isNotEmpty
-                                        ? valueController.searchRouteState ==
-                                                SearchRouterStateHelper.DONE
-                                            ? () async => await valueController
-                                                .onInitRouter()
-                                            : () async => await valueController
-                                                .onConfirmRouters()
-                                        : null,
-                                    child: Text(
-                                      valueController
-                                          .searchRouteState.getDescription,
-                                    ),
+                                                    .text =
+                                                valueController
+                                                    .addressDestination;
+                                          }
+                                        },
+                                      ),
+                                      SizedBox(
+                                        width: double.maxFinite,
+                                        child: ElevatedButton(
+                                          style: ButtonStyle(
+                                            shape: MaterialStateProperty
+                                                .resolveWith(
+                                              (states) =>
+                                                  RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                            ),
+                                          ),
+                                          onPressed: addressOriginEditingController
+                                                      .text.isNotEmpty &&
+                                                  addressDestinationEditingController
+                                                      .text.isNotEmpty
+                                              ? valueController
+                                                          .searchRouteState ==
+                                                      SearchRouterStateHelper
+                                                          .DONE
+                                                  ? () async =>
+                                                      await valueController
+                                                          .onInitRouter()
+                                                  : () async =>
+                                                      await valueController
+                                                          .onConfirmRouters()
+                                              : null,
+                                          child: Text(
+                                            valueController.searchRouteState
+                                                .getDescription,
+                                          ),
+                                        ),
+                                      )
+                                    ],
                                   ),
-                                )
-                              ],
+                                ),
+                              ),
                             ),
+                          )
+                        : Center(),
+                    Positioned(
+                      top: 16,
+                      left: 16,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          onPressed: () {
+                            controller.changeHistoricIsOpen();
+                            if (controller.historicIsOpen) {
+                              scaffoldKey.currentState!.openDrawer();
+                              return;
+                            }
+                            scaffoldKey.currentState!.closeDrawer();
+                          },
+                          icon: Icon(
+                            Icons.menu,
                           ),
                         ),
                       ),
@@ -233,24 +308,49 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         ),
         floatingActionButton: SizedBox(
-          height: 200,
+          height: MediaQuery.of(context).size.height * 3,
           width: 60,
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  onPressed: () => controller.changeSearchIsOpen(),
+                  icon: Icon(
+                    controller.searchIsOpen ? Icons.search_off : Icons.search,
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 8,
+              ),
               ZommButtomWidget(
                 onPressed: () => controller.zoomIn(),
                 icon: Icons.add,
               ),
+              SizedBox(
+                height: 8,
+              ),
               ZommButtomWidget(
                 onPressed: () => controller.zommOut(),
                 icon: Icons.remove,
+              ),
+              SizedBox(
+                height: 8,
               ),
               FloatingActionButton(
                 onPressed: () => controller.getCurrentLocation(),
                 child: Icon(
                   Icons.location_on,
                 ),
+              ),
+              SizedBox(
+                height: 16,
               ),
             ],
           ),
