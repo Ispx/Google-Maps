@@ -27,6 +27,8 @@ class MapsController extends ChangeNotifier {
   GoogleMapController? mapController;
   late LocationSettings locationSettings;
   late CameraPosition initialCameraPosition;
+  bool searchIsOpen = false;
+  bool historicIsOpen = false;
   Position? lastPosition;
   Set<Marker> markers = <Marker>{};
   Set<Polyline> polylines = <Polyline>{};
@@ -58,25 +60,18 @@ class MapsController extends ChangeNotifier {
       : '';
   List<Placemark> get placemarks => mapLocationPlaceMark.values.single;
 
-  Future<bool> _updateMyPositionInFirebase(Position myPosition) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection(CollectionsHelper.IN_ROUTER.getString)
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .update(
-        {
-          "current-position": myPosition.toJson(),
-        },
-      );
-      return true;
-    } catch (e) {
-      debugPrint(e.toString());
-      return false;
-    }
-  }
-
   _changeRouterState(SearchRouterStateHelper state) {
     searchRouteState = state;
+    notifyListeners();
+  }
+
+  changeSearchIsOpen() {
+    searchIsOpen = !searchIsOpen;
+    notifyListeners();
+  }
+
+  changeHistoricIsOpen() {
+    historicIsOpen = !historicIsOpen;
     notifyListeners();
   }
 
@@ -325,49 +320,92 @@ class MapsController extends ChangeNotifier {
     streamSearchController.close();
   }
 
-  Future<void> _registerRouterInFirebase(
+  Future<String> _registerDataInCollection(
+      {required String collection, String? doc, required dynamic data}) async {
+    try {
+      final docReference =
+          FirebaseFirestore.instance.collection(collection).doc(doc);
+      await docReference.set(data);
+      return docReference.id;
+    } catch (e) {
+      debugPrint("Failed: ${e.toString()}");
+      throw e.toString();
+    }
+  }
+
+  Future<bool> _updateDataInCorrection(
+      {required String collection,
+      required String doc,
+      required dynamic data}) async {
+    try {
+      await FirebaseFirestore.instance.collection(collection).doc(doc).update(
+            data,
+          );
+      return true;
+    } catch (e) {
+      debugPrint("Failed: ${e.toString()}");
+      return false;
+    }
+  }
+
+  Future<void> _registerRouter(
       {required LatLng origin, required LatLng destination}) async {
-    await FirebaseFirestore.instance
-        .collection(CollectionsHelper.IN_ROUTER.getString)
-        .doc(FirebaseAuth.instance.currentUser!.uid)
-        .set(
-      {
-        "userId": FirebaseAuth.instance.currentUser!.uid,
-        "name": FirebaseAuth.instance.currentUser?.displayName,
-        "email": FirebaseAuth.instance.currentUser?.email,
-        "origin": {
-          "lating": origin.toJson(),
-          "street": addressOrigin,
-        },
-        "destination": {
-          "lating": destination.toJson(),
-          "street": addressDestination,
-        },
-        "polylines": [...polylineCoordinates],
-        "status": RouterStatusHelper.ONGOING.getString,
-        "createdAt": DateTime.now(),
+    var data = {
+      "userId": FirebaseAuth.instance.currentUser!.uid,
+      "name": FirebaseAuth.instance.currentUser?.displayName,
+      "email": FirebaseAuth.instance.currentUser?.email,
+      "origin": {
+        "latitude": origin.latitude,
+        "longitude": origin.longitude,
+        "street": addressOrigin,
       },
+      "destination": {
+        "latitude": destination.latitude,
+        "longitude": destination.longitude,
+        "street": addressDestination,
+      },
+      "polylines": [
+        ...polylineCoordinates.map(
+          (e) => {
+            "latitude": e.latitude,
+            "longitude": e.longitude,
+          },
+        )
+      ],
+      "status": RouterStatusHelper.CREATED.getString,
+      "createdAt": DateTime.now(),
+    };
+    String id = await _registerDataInCollection(
+      collection: CollectionsHelper.HISTORIC.getString,
+      data: data,
+    );
+    _registerDataInCollection(
+      collection: CollectionsHelper.EN_ROUTE.getString,
+      doc: FirebaseAuth.instance.currentUser!.uid,
+      data: data
+        ..addAll({'id': id})
+        ..update('status', (value) => RouterStatusHelper.ONGOING.getString),
     );
   }
 
   onConfirmRouters() async {
     _changeRouterState(SearchRouterStateHelper.SEARCHING);
-    await _registerRouterInFirebase(
-      origin: LatLng(
-        locationOrigin!.latitude,
-        locationOrigin!.longitude,
-      ),
-      destination: LatLng(
-        locationDestination!.latitude,
-        locationDestination!.longitude,
-      ),
-    );
     await changePolylines(
       latLng1: LatLng(
         locationOrigin!.latitude,
         locationOrigin!.longitude,
       ),
       latLng2: LatLng(
+        locationDestination!.latitude,
+        locationDestination!.longitude,
+      ),
+    );
+    await _registerRouter(
+      origin: LatLng(
+        locationOrigin!.latitude,
+        locationOrigin!.longitude,
+      ),
+      destination: LatLng(
         locationDestination!.latitude,
         locationDestination!.longitude,
       ),
@@ -535,7 +573,13 @@ class MapsController extends ChangeNotifier {
           );
         }
         streamOnUpdateMyPositionInFirebase.sink.add(
-          await _updateMyPositionInFirebase(position!),
+          await _updateDataInCorrection(
+            collection: CollectionsHelper.EN_ROUTE.getString,
+            doc: FirebaseAuth.instance.currentUser!.uid,
+            data: {
+              "current-position": position!.toJson(),
+            },
+          ),
         );
       },
     );
