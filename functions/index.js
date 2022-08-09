@@ -10,29 +10,23 @@ admin.initializeApp();
 const db = admin.firestore();
 const batch = db.batch();
 
-exports.createNewDocumentInNotificationsCollection = functions.firestore
-    .document("routes/{documentId}")
-    .onCreate((snapshot, context) => {
-        var newDocRef = db.doc('notifications/${snapshot.id}');
-        batch.set(newDocRef, {
-            "data": "1"
-        })
+exports.listenCreationInEnRoute = functions.firestore
+    .document("en-route/{documentId}")
+    .onWrite((snapshot, context) => {
+        console.log(snapshot);
+        var newDocRef = db.doc('historic/${snapshot.id}');
+        batch.set(newDocRef, snapshot.data)
         return batch.commit();
     });
 
-exports.createOnNotificationsCollectionAndLogger = functions.firestore
-    .document("notifications/{documentId}")
-    .onCreate((snapshot, context) => {
+exports.createHistoric = functions.firestore
+    .document("historic/")
+    .onWrite((snapshot, context) => {
         functions.logger.info("Notificação do documento " + snapshot.id + " enviado!", { structuredData: true });
     });
 
 
 
-
-exports.helloWorld = functions.https.onRequest((request, response) => {
-    functions.logger.info("Hello logs!", { structuredData: true });
-    response.send("Hello from Firebase!");
-});
 
 
 
